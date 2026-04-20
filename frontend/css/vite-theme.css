@@ -1,0 +1,184 @@
+@import url("https://fonts.googleapis.com/css2?family=Mulish:wght@400;500;600;700;800&family=Urbanist:wght@500;600;700;800&display=swap");
+
+body.theme-vite {
+  --bg: hsl(226 4% 14%);
+  --surface: hsl(226 4% 16%);
+  --panel: hsl(226 4% 18%);
+  --elevated: hsl(226 4% 22%);
+  --border: hsl(226 4% 33%);
+  --border-subtle: hsl(226 4% 25%);
+  --border-focus: hsl(306 58% 47%);
+
+  --primary: hsl(306 58% 47%);
+  --secondary: hsl(267 66% 60%);
+  --accent: hsl(214 66% 60%);
+  --success: hsl(108 45% 58%);
+  --warning: hsl(25 82% 60%);
+  --error: hsl(347 64% 55%);
+
+  --text: hsl(0 0% 90%);
+  --text-bold: hsl(0 0% 100%);
+  --muted: hsl(0 0% 60%);
+  --text-secondary: hsl(0 0% 50%);
+
+  --primary-dim: hsl(306 58% 47% / 0.14);
+  --primary-glow: hsl(306 58% 47% / 0.35);
+
+  --radius: 12px;
+  --font-mono: "Mulish", ui-sans-serif, system-ui, sans-serif;
+  --line-height: 1.5;
+
+  background:
+    radial-gradient(1200px 600px at 10% -10%, hsl(267 66% 60% / 0.2), transparent 55%),
+    radial-gradient(900px 500px at 90% 0%, hsl(214 66% 60% / 0.16), transparent 52%),
+    linear-gradient(180deg, hsl(226 4% 14%), hsl(226 4% 12%));
+  color: var(--text);
+}
+
+body.theme-vite .topbar__logo,
+body.theme-vite .playlist-header__title,
+body.theme-vite .accordion__toggle,
+body.theme-vite .modal__title,
+body.theme-vite .settings-section__heading,
+body.theme-vite .track-settings-panel__title {
+  font-family: "Urbanist", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+
+body.theme-vite .workspace,
+body.theme-vite .sidebar,
+body.theme-vite .playlist-area,
+body.theme-vite .topbar,
+body.theme-vite .player-bar,
+body.theme-vite .modal,
+body.theme-vite .track-settings-panel,
+body.theme-vite .context-menu {
+  background: color-mix(in srgb, var(--surface) 90%, black 10%);
+}
+
+body.theme-vite .topbar,
+body.theme-vite .playlist-header,
+body.theme-vite .player-bar,
+body.theme-vite .sidebar,
+body.theme-vite .modal,
+body.theme-vite .track-settings-panel,
+body.theme-vite .context-menu,
+body.theme-vite .song-card,
+body.theme-vite .player__display,
+body.theme-vite .audio-upload,
+body.theme-vite .input,
+body.theme-vite .select,
+body.theme-vite .btn,
+body.theme-vite .playlist-filter__menu,
+body.theme-vite .track-settings-panel__body,
+body.theme-vite .ts-param-row__value--long {
+  border-color: var(--border);
+}
+
+body.theme-vite .topbar,
+body.theme-vite .playlist-header,
+body.theme-vite .player-bar {
+  backdrop-filter: blur(10px);
+}
+
+body.theme-vite .song-card,
+body.theme-vite .modal,
+body.theme-vite .track-settings-panel,
+body.theme-vite .context-menu,
+body.theme-vite .player__display,
+body.theme-vite .audio-upload,
+body.theme-vite .playlist-filter__menu,
+body.theme-vite .input,
+body.theme-vite .select,
+body.theme-vite .btn,
+body.theme-vite .ts-param-row__value--long {
+  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.2);
+  border-radius: 14px;
+}
+
+body.theme-vite .accordion__toggle:hover,
+body.theme-vite .btn:hover,
+body.theme-vite .playlist-filter__item:hover,
+body.theme-vite .context-menu__item:hover,
+body.theme-vite .song-card:hover {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+body.theme-vite .btn--primary,
+body.theme-vite .btn--generate,
+body.theme-vite .mode-btn.active,
+body.theme-vite .topbar__switch-btn:hover {
+  background: hsl(306 58% 47% / 0.18);
+  border-color: hsl(306 58% 47% / 0.8);
+  color: hsl(0 0% 100%);
+}
+
+body.theme-vite .input,
+body.theme-vite .select,
+body.theme-vite .player__display,
+body.theme-vite .playlist-search,
+body.theme-vite .song-card__cover,
+body.theme-vite .player__cover-wrap,
+body.theme-vite .audio-upload,
+body.theme-vite .modal__desc code {
+  background: hsl(226 4% 18%);
+}
+
+body.theme-vite .input:focus,
+body.theme-vite .select:focus,
+body.theme-vite .playlist-search:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px hsl(306 58% 47% / 0.25);
+}
+
+body.theme-vite .mode-btn,
+body.theme-vite .playlist-filter__btn,
+body.theme-vite .topbar__settings-btn,
+body.theme-vite .topbar__refresh-btn,
+body.theme-vite .topbar__switch-btn,
+body.theme-vite .player__btn,
+body.theme-vite .song-card__rate-btn,
+body.theme-vite .magic-btn,
+body.theme-vite .cot-toggle {
+  border-radius: 10px;
+}
+
+body.theme-vite .status-dot[data-status="ok"],
+body.theme-vite .status-dot[data-status="running"] {
+  box-shadow: 0 0 8px hsl(306 58% 47% / 0.9);
+}
+
+body.theme-vite .tick-slider__fill,
+body.theme-vite .player__seek-fill {
+  background: linear-gradient(90deg, hsl(267 66% 60%), hsl(306 58% 47%));
+  opacity: 0.7;
+}
+
+body.theme-vite .tick-slider__thumb,
+body.theme-vite .player__seek-cursor {
+  background: hsl(306 58% 47%);
+  box-shadow: 0 0 10px hsl(306 58% 47% / 0.5);
+}
+
+body.theme-vite .modal-backdrop,
+body.theme-vite .track-settings-backdrop {
+  background: rgba(9, 10, 14, 0.7);
+}
+
+body.theme-vite .playlist-scroll,
+body.theme-vite .sidebar__scroll,
+body.theme-vite .modal__body,
+body.theme-vite .track-settings-panel__body {
+  scrollbar-color: hsl(226 4% 33%) transparent;
+}
+
+.mode-selector {
+  gap:10px;
+}
+
+/* Active (currently playing) card must override the generic border-color reset above */
+body.theme-vite .song-card.active {
+  border-color: var(--primary);
+  box-shadow: inset 4px 0 0 var(--primary), 0 0 0 1px var(--primary-dim), 0 3px 16px rgba(0, 0, 0, 0.2);
+}

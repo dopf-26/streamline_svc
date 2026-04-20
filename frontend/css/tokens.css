@@ -1,0 +1,113 @@
+/*
+  ============================================================
+  Streamline — Design Tokens
+  Exact mirror of Side-Step GUI tokens for visual consistency.
+  ============================================================
+*/
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input, textarea, select, code,
+pre, [contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--bg);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius); }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+:root {
+  /* --- Surface hierarchy --- */
+  --bg:           #16161E;
+  --surface:      #1E1F28;
+  --panel:        #2D2E36;
+  --elevated:     #363742;
+  --border:       #4A5F8F;
+  --border-focus: #5ccfe6;
+  --border-subtle: #3a3f4f;
+
+  /* --- Semantic colors --- */
+  --primary:   #5ccfe6;
+  --secondary: #ff4fd8;
+  --accent:    #73d0ff;
+  --changed:   #d7b27a;
+  --success:   #7ec97a;
+  --warning:   #ffcc66;
+  --error:     #f07178;
+
+  /* --- Text --- */
+  --text:           #A1A8CF;
+  --text-bold:      #D5D8EC;
+  --muted:          #8995BC;
+  --text-secondary: #7A82A6;
+
+  /* --- Typography --- */
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+  --font-size-2xs: 10px;
+  --font-size-xs:  11px;
+  --font-size-sm:  13px;
+  --font-size-base: 14px;
+  --font-size-lg:  16px;
+  --font-size-xl:  20px;
+  --font-size-2xl: 22px;
+  --font-size-3xl: 24px;
+  --line-height:   1.6;
+
+  /* --- Spacing --- */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* --- Borders --- */
+  --radius:   2px;
+  --border-w: 1px;
+
+  /* --- RGB components for CRT bloom rgba --- */
+  --primary-r: 92;   --primary-g: 207;  --primary-b: 230;
+  --secondary-r: 255; --secondary-g: 79;  --secondary-b: 216;
+  --accent-r: 115;   --accent-g: 208;   --accent-b: 255;
+  --success-r: 126;  --success-g: 201;  --success-b: 122;
+  --warning-r: 255;  --warning-g: 204;  --warning-b: 102;
+  --error-r: 240;    --error-g: 113;    --error-b: 120;
+  --changed-r: 215;  --changed-g: 178;  --changed-b: 122;
+
+  /* --- Focus & tint --- */
+  --primary-dim:  rgba(92, 207, 230, 0.10);
+  --primary-glow: rgba(92, 207, 230, 0.25);
+
+  /* --- Transitions --- */
+  --transition-fast: 100ms ease;
+  --transition-base: 150ms ease;
+  --transition-slow: 250ms ease;
+}

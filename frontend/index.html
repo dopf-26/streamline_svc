@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Streamline — SVC</title>
+  <link rel="icon" type="image/png" href="/images/favicon.png" />
+  <link rel="stylesheet" href="/css/tokens.css?v=2" />
+  <link rel="stylesheet" href="/css/vocals.css?v=2" />
+  <link rel="stylesheet" href="/css/vite-theme.css?v=1" />
+  <!-- WaveSurfer.js for waveform rendering -->
+  <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+</head>
+<body>
+
+<!-- ================================================================
+     LOADING SCREEN
+     ================================================================ -->
+<div class="splash" id="splash" aria-hidden="true">
+  <div class="splash__inner">
+    <div class="splash__logo">
+      ¦┤▒├¦ STREAMLINE
+      <span class="splash__logo-sub">SVC</span>
+    </div>
+    <div class="splash__bar-track">
+      <div class="splash__bar-fill" id="splash-bar"></div>
+    </div>
+  </div>
+</div>
+
+<div class="workspace" id="workspace">
+
+  <!-- ================================================================
+       TOP BAR
+       ================================================================ -->
+  <header class="topbar">
+    <div class="topbar__logo">
+      ¦┤▒├¦ STREAMLINE
+      <span class="topbar__logo-sub">SVC</span>
+    </div>
+    <div class="topbar__models">
+      <div class="topbar__model-field">
+        <label class="topbar__model-label">DiT</label>
+        <select class="select topbar__model-select" id="dit-model">
+          <option value="">Loading…</option>
+        </select>
+      </div>
+      <button class="topbar__switch-btn" id="switch-models-btn" title="Restart ACE-Step server with selected model">
+        Switch model
+      </button>
+    </div>
+    <div class="topbar__spacer"></div>
+    <div class="topbar__status" id="status-bar">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-text">ACE-Step…</span>
+      <span class="topbar__status-sep">|</span>
+      <span class="status-dot" id="rvc-status-dot"></span>
+      <span id="rvc-status-text">RVC…</span>
+      <button class="topbar__refresh-btn" id="refresh-btn" title="Refresh models &amp; LoRA paths">↺</button>
+      <button class="topbar__settings-btn" id="settings-btn" title="Settings">⚙</button>
+    </div>
+  </header>
+
+  <!-- ================================================================
+       SUB-BAR (output path + run pipeline)
+       ================================================================ -->
+  <div class="subbar">
+    <span class="subbar__label">Output</span>
+    <input type="text" class="subbar__path-input" id="output-path" value="./output" placeholder="./output" />
+    <button class="subbar__browse-btn" id="browse-output-btn">Browse…</button>
+    <div class="subbar__spacer"></div>
+    <div class="subbar__actions">
+      <label class="subbar__label" for="pipeline-batch-size">Batch</label>
+      <select class="select subbar__pipeline-batch-select" id="pipeline-batch-size">
+        <option value="1" selected>1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+      </select>
+      <div class="subbar__run-stack">
+        <button class="subbar__run-btn" id="run-pipeline-btn" disabled>▶ Run Pipeline</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       3-COLUMN CONTENT
+       ================================================================ -->
+  <div class="workspace__content">
+
+    <!-- ============================================================
+         COLUMN 1 — INPUT SETTINGS
+         ============================================================ -->
+    <div class="column" id="col-input">
+      <div class="column__header">
+        <span class="column__title">Input Settings</span>
+      </div>
+      <div class="column__scroll">
+
+        <!-- Source Audio -->
+        <div class="field-group">
+          <label class="field-group__label">Source Audio</label>
+          <div class="audio-upload" id="source-audio" data-field="source_audio_path">
+            <div class="audio-upload__dropzone">
+              <span class="audio-upload__icon">♪</span>
+              <span class="audio-upload__text">Drop vocal audio or click to browse</span>
+              <input type="file" accept="audio/*" hidden />
+            </div>
+            <div class="audio-upload__player">
+              <div class="audio-upload__waveform"></div>
+              <div class="audio-upload__controls">
+                <button class="btn btn--xs audio-upload__play-btn">▶</button>
+                <span class="audio-upload__time">0:00 / 0:00</span>
+                <button class="btn btn--xs btn--danger audio-upload__trash-btn">🗑</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pitch Shift -->
+        <div class="tick-slider tick-slider--bipolar" id="ts-pitch-shift"
+             data-min="-12" data-max="12" data-value="0" data-step="1">
+          <div class="tick-slider__header">
+            <span class="tick-slider__label">Pitch Shift <span class="tick-slider__label-hint">(semitones)</span></span>
+            <span class="tick-slider__value">0</span>
+          </div>
+          <div class="tick-slider__track" tabindex="0" role="slider"
+               aria-label="Pitch Shift" aria-valuemin="-12" aria-valuemax="12" aria-valuenow="0">
+            <div class="tick-slider__bg"></div>
+            <div class="tick-slider__fill"></div>
+            <div class="tick-slider__thumb"></div>
+          </div>
+        </div>
+
+        <!-- Audio Processing Toggles -->
+        <div class="field-group">
+          <label class="field-group__label">Pre-processing</label>
+          <label class="toggle-row" title="80 Hz high-pass @ -12 dB/oct — removes sub-bass before pitch shift">
+            <input type="checkbox" id="apply-low-cut" checked />
+            <span class="toggle-row__label">Low-cut filter <span class="hint">(80 Hz, -12 dB/oct)</span></span>
+          </label>
+          <label class="toggle-row" title="-40 dB threshold, 5 ms attack/release noise gate">
+            <input type="checkbox" id="apply-noise-gate" checked />
+            <span class="toggle-row__label">Noise gate <span class="hint">(-40 dB, 5 ms)</span></span>
+          </label>
+        </div>
+
+        <!-- Music Caption -->
+        <div class="field-group">
+          <label class="field-group__label">Music Caption</label>
+          <div class="textarea-wrap">
+            <textarea class="input textarea" id="caption" rows="4"
+              placeholder="Describe the vocal style…">a capella, lead vocals only, solo vocalist, </textarea>
+          </div>
+        </div>
+
+        <!-- Lyrics -->
+        <div class="field-group">
+          <label class="field-group__label">Lyrics</label>
+          <div class="textarea-wrap">
+            <textarea class="input textarea" id="lyrics" rows="7"
+              placeholder="Write lyrics or type [Instrumental]">[verse]
+</textarea>
+            <button class="action-btn" id="transcribe-btn" title="Transcribe source audio with Whisper large-v3">
+              ✦ Transcribe
+            </button>
+          </div>
+        </div>
+
+      </div><!-- /column__scroll -->
+    </div><!-- /col-input -->
+
+    <!-- ============================================================
+         COLUMN 2 — ACE-STEP SETTINGS
+         ============================================================ -->
+    <div class="column" id="col-acestep">
+      <div class="column__header">
+        <span class="column__title">ACE-Step</span>
+      </div>
+      <div class="column__scroll">
+
+        <!-- Reference Audio -->
+        <div class="field-group">
+          <label class="field-group__label">Reference Audio</label>
+          <div class="audio-upload" id="ref-audio" data-field="ref_audio_path">
+            <div class="audio-upload__dropzone">
+              <span class="audio-upload__icon">♪</span>
+              <span class="audio-upload__text">Drop reference audio or click to browse</span>
+              <input type="file" accept="audio/*" hidden />
+            </div>
+            <div class="audio-upload__player">
+              <div class="audio-upload__waveform"></div>
+              <div class="audio-upload__controls">
+                <button class="btn btn--xs audio-upload__play-btn">▶</button>
+                <span class="audio-upload__time">0:00 / 0:00</span>
+                <button class="btn btn--xs btn--danger audio-upload__trash-btn">🗑</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Remix Strength -->
+        <div class="tick-slider" id="ts-remix-strength" data-min="0" data-max="1" data-value="0.05" data-step="0.01">
+          <div class="tick-slider__header">
+            <span class="tick-slider__label">Remix Strength</span>
+            <span class="tick-slider__value">0.05</span>
+          </div>
+          <div class="tick-slider__track" tabindex="0" role="slider"
+               aria-label="Remix Strength" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0.05">
+            <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+          </div>
+        </div>
+
+        <!-- Cover Strength -->
+        <div class="tick-slider" id="ts-cover-strength" data-min="0" data-max="1" data-value="0.27" data-step="0.01">
+          <div class="tick-slider__header">
+            <span class="tick-slider__label">Cover Strength</span>
+            <span class="tick-slider__value">0.27</span>
+          </div>
+          <div class="tick-slider__track" tabindex="0" role="slider"
+               aria-label="Cover Strength" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0.27">
+            <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+          </div>
+        </div>
+
+        <!-- LoRA Setup (closed) -->
+        <div class="accordion" id="acc-lora">
+          <button class="accordion__toggle" aria-expanded="false" aria-controls="acc-lora-body">
+            <span class="accordion__arrow">›</span> LoRA Setup
+          </button>
+          <div class="accordion__body" id="acc-lora-body">
+            <div class="accordion__content">
+              <div class="field-group lora-count-field lora-slot-only">
+                <label class="field-group__label">Number of LoRAs</label>
+                <input type="number" class="input lora-count-input" id="lora-count" value="1" min="1" max="4" />
+              </div>
+              <div id="lora-rows-container">
+
+                <!-- LoRA row 1 (always visible) -->
+                <div class="lora-row" id="lora-row-1">
+                  <div class="field-group">
+                    <label class="field-group__label">LoRA 1</label>
+                    <select class="select" id="lora-select-1"><option value="">(none)</option></select>
+                  </div>
+                  <div class="tick-slider first_slider" id="ts-lora-scale-1" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">Strength</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 1 Strength" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                  <div class="tick-slider lora-slot-only" id="ts-lora-sa-1" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">Self Attn</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 1 Self Attention" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                  <div class="tick-slider lora-slot-only" id="ts-lora-ca-1" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">Cross Attn</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 1 Cross Attention" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                  <div class="tick-slider lora-slot-only" id="ts-lora-mlp-1" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">MLP</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 1 MLP" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                </div>
+
+                <!-- LoRA row 2 -->
+                <div class="lora-row" id="lora-row-2" style="display:none;">
+                  <div class="field-group">
+                    <label class="field-group__label">LoRA 2</label>
+                    <select class="select" id="lora-select-2"><option value="">(none)</option></select>
+                  </div>
+                  <div class="tick-slider first_slider" id="ts-lora-scale-2" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">Strength</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 2 Strength" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                  <div class="tick-slider lora-slot-only" id="ts-lora-sa-2" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">Self Attn</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 2 Self Attention" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                  <div class="tick-slider lora-slot-only" id="ts-lora-ca-2" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">Cross Attn</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 2 Cross Attention" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                  <div class="tick-slider lora-slot-only" id="ts-lora-mlp-2" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">MLP</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 2 MLP" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                </div>
+
+                <!-- LoRA row 3 -->
+                <div class="lora-row" id="lora-row-3" style="display:none;">
+                  <div class="field-group">
+                    <label class="field-group__label">LoRA 3</label>
+                    <select class="select" id="lora-select-3"><option value="">(none)</option></select>
+                  </div>
+                  <div class="tick-slider first_slider" id="ts-lora-scale-3" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">Strength</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 3 Strength" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                  <div class="tick-slider lora-slot-only" id="ts-lora-sa-3" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">Self Attn</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 3 Self Attention" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                  <div class="tick-slider lora-slot-only" id="ts-lora-ca-3" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">Cross Attn</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 3 Cross Attention" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                  <div class="tick-slider lora-slot-only" id="ts-lora-mlp-3" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">MLP</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 3 MLP" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                </div>
+
+                <!-- LoRA row 4 -->
+                <div class="lora-row" id="lora-row-4" style="display:none;">
+                  <div class="field-group">
+                    <label class="field-group__label">LoRA 4</label>
+                    <select class="select" id="lora-select-4"><option value="">(none)</option></select>
+                  </div>
+                  <div class="tick-slider first_slider" id="ts-lora-scale-4" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">Strength</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 4 Strength" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                  <div class="tick-slider lora-slot-only" id="ts-lora-sa-4" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">Self Attn</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 4 Self Attention" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                  <div class="tick-slider lora-slot-only" id="ts-lora-ca-4" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">Cross Attn</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 4 Cross Attention" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                  <div class="tick-slider lora-slot-only" id="ts-lora-mlp-4" data-min="0" data-max="4" data-value="1.0" data-step="0.05">
+                    <div class="tick-slider__header"><span class="tick-slider__label">MLP</span><span class="tick-slider__value">1.00</span></div>
+                    <div class="tick-slider__track" tabindex="0" role="slider" aria-label="LoRA 4 MLP" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1.0"><div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div></div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parameters (closed) -->
+        <div class="accordion" id="acc-params">
+          <button class="accordion__toggle" aria-expanded="false" aria-controls="acc-params-body">
+            <span class="accordion__arrow">›</span> Parameters
+          </button>
+          <div class="accordion__body" id="acc-params-body">
+            <div class="accordion__content">
+              <div class="field-row">
+                <div class="field-group">
+                  <label class="field-group__label">Key</label>
+                  <select class="select" id="keyscale"><option value="">auto</option></select>
+                </div>
+                <div class="field-group">
+                  <label class="field-group__label">Time Signature</label>
+                  <select class="select" id="timesignature">
+                    <option value="">auto</option>
+                    <option value="2">2/4</option>
+                    <option value="3">3/4</option>
+                    <option value="4">4/4</option>
+                    <option value="6">6/8</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-group">
+                <label class="field-group__label">Vocal Language</label>
+                <select class="select" id="vocal-language">
+                  <option value="unknown">auto / Instrumental</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label class="field-group__label">Seed <span class="hint">(-1=random)</span></label>
+                <input type="number" class="input" id="seed" value="-1" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DiT Settings (closed) -->
+        <div class="accordion" id="acc-dit">
+          <button class="accordion__toggle" aria-expanded="false" aria-controls="acc-dit-body">
+            <span class="accordion__arrow">›</span> DiT Settings
+          </button>
+          <div class="accordion__body" id="acc-dit-body">
+            <div class="accordion__content">
+              <div class="field-row">
+                <div class="field-group">
+                  <label class="field-group__label">Infer Method</label>
+                  <select class="select" id="infer-method">
+                    <option value="ode" selected>ODE</option>
+                    <option value="sde">SDE</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label class="field-group__label">Sampler</label>
+                  <select class="select" id="sampler-mode" disabled title="Not supported by current ACE-Step API">
+                    <option value="euler" selected>Euler</option>
+                    <option value="heun">Heun</option>
+                  </select>
+                  <div class="unsupported-note">Not supported by current API.</div>
+                </div>
+              </div>
+              <div class="tick-slider" id="ts-inference-steps" data-min="1" data-max="100" data-value="20" data-step="1">
+                <div class="tick-slider__header">
+                  <span class="tick-slider__label">Inference Steps</span>
+                  <span class="tick-slider__value">20</span>
+                </div>
+                <div class="tick-slider__track" tabindex="0" role="slider"
+                     aria-label="Inference Steps" aria-valuemin="1" aria-valuemax="100" aria-valuenow="20">
+                  <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+                </div>
+              </div>
+              <div class="tick-slider" id="ts-guidance-scale" data-min="1" data-max="15" data-value="7.0" data-step="0.1">
+                <div class="tick-slider__header">
+                  <span class="tick-slider__label">Guidance Scale</span>
+                  <span class="tick-slider__value">7.0</span>
+                </div>
+                <div class="tick-slider__track" tabindex="0" role="slider"
+                     aria-label="Guidance Scale" aria-valuemin="1" aria-valuemax="15" aria-valuenow="7.0">
+                  <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+                </div>
+              </div>
+              <div class="tick-slider" id="ts-shift" data-min="1" data-max="5" data-value="3.0" data-step="0.1">
+                <div class="tick-slider__header">
+                  <span class="tick-slider__label">Shift</span>
+                  <span class="tick-slider__value">3.0</span>
+                </div>
+                <div class="tick-slider__track" tabindex="0" role="slider"
+                     aria-label="Shift" aria-valuemin="1" aria-valuemax="5" aria-valuenow="3.0">
+                  <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="tick-slider" id="ts-cfg-start" data-min="0" data-max="1" data-value="0.0" data-step="0.01">
+                  <div class="tick-slider__header">
+                    <span class="tick-slider__label">CFG Start</span>
+                    <span class="tick-slider__value">0.00</span>
+                  </div>
+                  <div class="tick-slider__track" tabindex="0" role="slider"
+                       aria-label="CFG Interval Start" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0">
+                    <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+                  </div>
+                </div>
+                <div class="tick-slider" id="ts-cfg-end" data-min="0" data-max="1" data-value="1.0" data-step="0.01">
+                  <div class="tick-slider__header">
+                    <span class="tick-slider__label">CFG End</span>
+                    <span class="tick-slider__value">1.00</span>
+                  </div>
+                  <div class="tick-slider__track" tabindex="0" role="slider"
+                       aria-label="CFG Interval End" aria-valuemin="0" aria-valuemax="1" aria-valuenow="1">
+                    <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="tick-slider is-disabled" id="ts-vel-norm" data-min="0" data-max="5" data-value="0" data-step="0.1" title="Not supported by current ACE-Step API">
+                  <div class="tick-slider__header">
+                    <span class="tick-slider__label">Vel Norm Thr.</span>
+                    <span class="tick-slider__value">0.0</span>
+                  </div>
+                  <div class="tick-slider__track" tabindex="-1" role="slider" aria-disabled="true" aria-label="Velocity Norm Threshold" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0">
+                    <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+                  </div>
+                </div>
+                <div class="tick-slider is-disabled" id="ts-vel-ema" data-min="0" data-max="0.5" data-value="0" data-step="0.01" title="Not supported by current ACE-Step API">
+                  <div class="tick-slider__header">
+                    <span class="tick-slider__label">Vel EMA Factor</span>
+                    <span class="tick-slider__value">0.00</span>
+                  </div>
+                  <div class="tick-slider__track" tabindex="-1" role="slider" aria-disabled="true" aria-label="Velocity EMA Factor" aria-valuemin="0" aria-valuemax="0.5" aria-valuenow="0">
+                    <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="unsupported-note">Velocity controls are not supported by current ACE-Step API.</div>
+              <label class="toggle-row">
+                <input type="checkbox" id="use-adg" />
+                <span class="toggle-row__label">Adaptive Dual Guidance (ADG)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Result waveform -->
+        <div id="result-section">
+          <div class="result-placeholder" id="result-placeholder">
+            <span>♪</span>
+            <span>Run ACE-Step to see result</span>
+          </div>
+          <div class="result-waveform" id="result-waveform-wrap" style="display:none;">
+            <div class="result-waveform__wave" id="result-wave" title="Click to play"></div>
+            <div class="result-waveform__controls">
+              <button class="btn btn--xs" id="result-play-btn">▶</button>
+              <span class="result-waveform__time" id="result-time">0:00 / 0:00</span>
+              <button class="result-waveform__save-btn" id="result-save-btn">↓ Save to output</button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /column__scroll -->
+
+      <!-- Footer: Run ACE-Step -->
+      <div class="column__footer">
+        <button class="btn btn--generate btn--full" id="generate-btn" disabled>▶ Run ACE-Step</button>
+      </div>
+    </div><!-- /col-acestep -->
+
+    <!-- ============================================================
+         COLUMN 3 — RVC SETTINGS
+         ============================================================ -->
+    <div class="column" id="col-rvc">
+      <div class="column__header">
+        <span class="column__title">RVC</span>
+      </div>
+      <div class="column__scroll">
+
+        <!-- Voice Model -->
+        <div class="field-group">
+          <label class="field-group__label">Voice Model <span class="hint">(.pth)</span></label>
+          <select class="input input--select" id="rvc-model">
+            <option value="">— No models found —</option>
+          </select>
+        </div>
+
+        <!-- Index File -->
+        <div class="field-group">
+          <label class="field-group__label">Index File <span class="hint">(.index, optional)</span></label>
+          <select class="input input--select" id="rvc-index">
+            <option value="">— None —</option>
+          </select>
+        </div>
+
+        <!-- Clean Audio -->
+        <div class="field-group">
+          <label class="toggle-row" title="Apply noisereduce/pedalboard cleaning to converted audio">
+            <input type="checkbox" id="rvc-clean-audio" checked />
+            <span class="toggle-row__label">Clean Audio</span>
+          </label>
+        </div>
+
+        <!-- Clean Strength -->
+        <div class="tick-slider" id="ts-rvc-clean-strength" data-min="0" data-max="1" data-value="0.3" data-step="0.01">
+          <div class="tick-slider__header">
+            <span class="tick-slider__label">Clean Strength</span>
+            <span class="tick-slider__value">0.30</span>
+          </div>
+          <div class="tick-slider__track" tabindex="0" role="slider"
+               aria-label="Clean Strength" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0.3">
+            <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+          </div>
+        </div>
+
+        <!-- Index Strength -->
+        <div class="tick-slider" id="ts-rvc-index-rate" data-min="0" data-max="1" data-value="0.2" data-step="0.01">
+          <div class="tick-slider__header">
+            <span class="tick-slider__label">Index Strength</span>
+            <span class="tick-slider__value">0.20</span>
+          </div>
+          <div class="tick-slider__track" tabindex="0" role="slider"
+               aria-label="Index Strength" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0.2">
+            <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+          </div>
+        </div>
+
+        <!-- Volume Envelope -->
+        <div class="tick-slider" id="ts-rvc-volume-envelope" data-min="0" data-max="1" data-value="0.3" data-step="0.01">
+          <div class="tick-slider__header">
+            <span class="tick-slider__label">Volume Envelope</span>
+            <span class="tick-slider__value">0.30</span>
+          </div>
+          <div class="tick-slider__track" tabindex="0" role="slider"
+               aria-label="Volume Envelope" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0.3">
+            <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+          </div>
+        </div>
+
+        <!-- Protect Voiceless Consonants -->
+        <div class="tick-slider" id="ts-rvc-protect" data-min="0" data-max="0.5" data-value="0.3" data-step="0.01">
+          <div class="tick-slider__header">
+            <span class="tick-slider__label">Protect Voiceless <span class="tick-slider__label-hint">(consonants)</span></span>
+            <span class="tick-slider__value">0.30</span>
+          </div>
+          <div class="tick-slider__track" tabindex="0" role="slider"
+               aria-label="Protect Voiceless Consonants" aria-valuemin="0" aria-valuemax="0.5" aria-valuenow="0.3">
+            <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+          </div>
+        </div>
+
+        <!-- Filter Radius -->
+        <div class="tick-slider" id="ts-rvc-filter-radius" data-min="0" data-max="7" data-value="3" data-step="1">
+          <div class="tick-slider__header">
+            <span class="tick-slider__label">Filter Radius <span class="tick-slider__label-hint">(F0 smoothing)</span></span>
+            <span class="tick-slider__value">3</span>
+          </div>
+          <div class="tick-slider__track" tabindex="0" role="slider"
+               aria-label="Filter Radius" aria-valuemin="0" aria-valuemax="7" aria-valuenow="3">
+            <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+          </div>
+        </div>
+
+        <!-- Advanced (accordion) -->
+        <div class="accordion" id="rvc-advanced-accordion">
+          <button class="accordion__toggle" aria-expanded="false" aria-controls="acc-rvc-advanced-body">
+            <span class="accordion__arrow">›</span> Advanced
+          </button>
+          <div class="accordion__body" id="acc-rvc-advanced-body">
+            <div class="accordion__content">
+
+            <!-- Pitch -->
+            <div class="tick-slider tick-slider--bipolar" id="ts-rvc-pitch"
+                 data-min="-24" data-max="24" data-value="0" data-step="1">
+              <div class="tick-slider__header">
+                <span class="tick-slider__label">Pitch <span class="tick-slider__label-hint">(semitones)</span></span>
+                <span class="tick-slider__value">0</span>
+              </div>
+              <div class="tick-slider__track" tabindex="0" role="slider"
+                   aria-label="RVC Pitch" aria-valuemin="-24" aria-valuemax="24" aria-valuenow="0">
+                <div class="tick-slider__bg"></div><div class="tick-slider__fill"></div><div class="tick-slider__thumb"></div>
+              </div>
+            </div>
+
+            <!-- Pitch Extractor -->
+            <div class="field-group">
+              <label class="field-group__label">Pitch Extractor</label>
+              <select class="input input--select" id="rvc-f0-method">
+                <option value="rmvpe" selected>rmvpe</option>
+                <option value="crepe">crepe</option>
+                <option value="harvest">harvest</option>
+                <option value="pm">pm</option>
+                <option value="dio">dio</option>
+              </select>
+            </div>
+
+            <!-- Embedder Model -->
+            <div class="field-group">
+              <label class="field-group__label">Embedder Model</label>
+              <select class="input input--select" id="rvc-embedder-model">
+                <option value="contentvec" selected>contentvec</option>
+                <option value="hubert">hubert</option>
+              </select>
+            </div>
+
+            <!-- Seed -->
+            <div class="field-group">
+              <label class="field-group__label">Seed</label>
+              <input type="number" class="input" id="rvc-seed" value="-1" min="-1" step="1" />
+            </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- RVC result waveform -->
+        <div id="rvc-result-section">
+          <div class="result-placeholder" id="rvc-result-placeholder">
+            <span>🎤</span>
+            <span>Run RVC to see result</span>
+          </div>
+          <div class="result-waveform" id="rvc-result-waveform-wrap" style="display:none;">
+            <div class="result-waveform__wave" id="rvc-result-wave" title="Click to play"></div>
+            <div class="result-waveform__controls">
+              <button class="btn btn--xs" id="rvc-play-btn">▶</button>
+              <span class="result-waveform__time" id="rvc-result-time">0:00 / 0:00</span>
+              <button class="result-waveform__save-btn" id="rvc-save-btn">↓ Save to output</button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /column__scroll -->
+
+      <!-- Footer: Run RVC -->
+      <div class="column__footer">
+        <button class="btn btn--generate btn--full" id="rvc-run-btn">▶ Run RVC</button>
+      </div>
+    </div><!-- /col-rvc -->
+
+  </div><!-- /workspace__content -->
+
+</div><!-- /workspace -->
+
+<!-- Toast container -->
+<div class="toast-root" id="toast-root"></div>
+
+<!-- ================================================================
+     SETTINGS MODAL
+     ================================================================ -->
+<div class="modal-backdrop" id="settings-backdrop" hidden>
+  <div class="modal" id="settings-modal" role="dialog" aria-label="Settings">
+    <div class="modal__header">
+      <span class="modal__title">Settings</span>
+      <button class="modal__close" id="settings-close">&times;</button>
+    </div>
+    <div class="modal__body">
+
+      <div class="settings-section">
+        <div class="settings-section__heading">API Endpoints</div>
+        <div class="field-group">
+          <label class="field-group__label">ACE-Step API Address</label>
+          <input type="text" class="input" id="setting-acestep-url" placeholder="http://127.0.0.1:8001" />
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section__heading">Whisper</div>
+        <div class="field-group">
+          <label class="field-group__label">Model</label>
+          <select class="select" id="setting-whisper-model">
+            <option value="tiny">tiny</option>
+            <option value="base" selected>base</option>
+            <option value="small">small</option>
+            <option value="medium">medium</option>
+            <option value="large-v2">large-v2</option>
+            <option value="large-v3">large-v3</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section__heading">ACE-Step Server</div>
+        <div class="settings-section__hint">Applied on next model switch or server restart.</div>
+        <div class="field-group">
+          <label class="toggle-row">
+            <input type="checkbox" id="setting-flash-attn" />
+            <span class="toggle-row__label">Flash Attention 2 <span class="hint">(CUDA Ampere+ only)</span></span>
+          </label>
+        </div>
+        <div class="field-group">
+          <label class="toggle-row">
+            <input type="checkbox" id="setting-compile" />
+            <span class="toggle-row__label">Compile model <span class="hint">(torch.compile; CUDA/CPU only)</span></span>
+          </label>
+        </div>
+        <div class="field-group">
+          <label class="toggle-row">
+            <input type="checkbox" id="setting-cpu-offload" />
+            <span class="toggle-row__label">CPU offload <span class="hint">(auto when VRAM &lt; 16 GB)</span></span>
+          </label>
+        </div>
+        <div class="field-group">
+          <label class="toggle-row">
+            <input type="checkbox" id="setting-dit-offload" />
+            <span class="toggle-row__label">DiT CPU offload</span>
+          </label>
+        </div>
+        <div class="field-group">
+          <label class="toggle-row">
+            <input type="checkbox" id="setting-mlx-patches" />
+            <span class="toggle-row__label">MLX optimizations <span class="hint">(Apple Silicon only: float16 weights, decoder offload, fp16 text encoder)</span></span>
+          </label>
+        </div>
+        <div class="field-group">
+          <label class="toggle-row">
+            <input type="checkbox" id="setting-lora-slot-patch" />
+            <span class="toggle-row__label">Custom LoRA monkeypatch <span class="hint">(enables slot-based weight merging with per-layer SA/CA/MLP scale controls; applied on next server restart)</span></span>
+          </label>
+        </div>
+        <div class="field-group">
+          <label class="field-group__label">ACE-Step CUDA Device</label>
+          <select class="input select" id="setting-acestep-cuda-device">
+            <option value="auto">Auto</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-group__label">RVC CUDA Device</label>
+          <select class="input select" id="setting-rvc-cuda-device">
+            <option value="auto">Auto</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn--primary" id="settings-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     JavaScript
+     ================================================================ -->
+<script src="/js/api.js?v=2"></script>
+<script src="/js/slider.js?v=2"></script>
+<script src="/js/audio-upload.js?v=2"></script>
+<script src="/js/player.js?v=2"></script>
+<script src="/js/app.js?v=2"></script>
+
+<script>
+(function () {
+  const SPLASH_KEY = "streamline_svc.splash_shown";
+  const DURATION = 2500;
+  const splash = document.getElementById("splash");
+  const bar    = document.getElementById("splash-bar");
+  if (!splash || !bar) return;
+
+  if (sessionStorage.getItem(SPLASH_KEY)) {
+    splash.remove();
+    return;
+  }
+  sessionStorage.setItem(SPLASH_KEY, "1");
+
+  const start = performance.now();
+
+  function tick(now) {
+    const elapsed = now - start;
+    const pct = Math.min(elapsed / DURATION * 100, 100);
+    bar.style.width = pct + "%";
+    if (elapsed < DURATION) {
+      requestAnimationFrame(tick);
+    } else {
+      _dismiss();
+    }
+  }
+
+  function _dismiss() {
+    splash.classList.add("splash--out");
+    splash.addEventListener("transitionend", () => splash.remove(), { once: true });
+  }
+
+  requestAnimationFrame(tick);
+})();
+</script>
+
+</body>
+</html>
