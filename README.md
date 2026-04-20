@@ -4,26 +4,23 @@ A custom web UI for ACE-Step 1.5 and Applio RVC. Singing Voice Conversion by com
 
 Built on a FastAPI backend and an Electron-based web UI.
 
-<img width="1920" height="1067" alt="preview" src="https://github.com/user-attachments/assets/d54460e5-a002-462f-8ebc-4fd2ba00402c" />
+<img width="2560" height="1307" alt="preview" src="https://github.com/user-attachments/assets/95ca94ad-18ce-4196-9922-3c80d3b0bc73" />
 
----
 
 ## Requirements
 
 - A working [ACE-Step 1.5](https://github.com/ace-step/ACE-Step-1.5) installation
 
----
 
 ## Installation
 
 ```
 cd <your ACE-Step 1.5 install folder>
-git clone --recurse-submodules https://github.com/dopf-26/streamline-svc.git
+git clone --recurse-submodules https://github.com/dopf-26/streamline_svc.git
 ```
 
 Run start_vocals.bat to create a virtual environment and install the requirements using UV automatically.
 
----
 
 ## Usage
 
@@ -36,7 +33,6 @@ Models and Index files for RVC are loaded from streamline_svc/applio/logs.
 
 Remix Strength and Cover Strength are the most important factors on how close the input audio is followed. The defaults (0.05 - 0.27) follow closely but give a bit of creative freedom. I'd suggest to keep Remix Strength at 0.05 and increase cover strength to follow the input more closely, or lower it to be more creative.
 
----
 
 ## Features
 
@@ -44,8 +40,6 @@ Remix Strength and Cover Strength are the most important factors on how close th
 - Automatic input audio transcription using Whisper 3
 - Preprocessing Pitch shift, Low Cut and Noise Gate
 
-
----
 
 ## Credit and Thanks
 
