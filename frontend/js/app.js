@@ -57,11 +57,11 @@ let _activeJobInterval = null;
 let _resultRawPath = null;    // raw server-side path for save operation
 let _resultAudioUrl = null;   // URL for bottom player
 let _sourceOriginalName = ""; // input filename stem for output naming
-let _resultOutputIndex = 1;   // incrementing index for saved files
 let _resultWs = null;         // WaveSurfer for result waveform
 let _rvcResultPath = null;    // server-side path for RVC output
 let _rvcResultWs = null;      // WaveSurfer for RVC result waveform
 let _pipelineRunning = false;
+const _pipelineQueue = []; // queued pipeline snapshots
 
 const _KEY_OPTIONS = [
   "C major", "C# major", "D major", "Eb major", "E major", "F major", "F# major", "G major", "Ab major", "A major", "Bb major", "B major",
@@ -139,20 +139,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 // ------------------------------------------------------------------
 
 async function _pollHealth() {
+  const busy = _pipelineRunning || Boolean(_activeJobId);
   try {
     const h = await API.health();
     _acestepReady = Boolean(h.acestep_ready);
     _setAcestepStatus(
       h.acestep_api === "ok"
         ? (_acestepReady ? "ok" : "partial")
-        : "error",
+        : (busy ? "partial" : "error"),
       h.acestep_api === "ok"
         ? (_acestepReady ? "Ready" : "Loading…")
-        : "Unavailable"
+        : (busy ? "Busy" : "Unavailable")
     );
     _setGenerateReady(_acestepReady && !_activeJobId);
   } catch {
-    _setAcestepStatus("error", "Unreachable");
+    _setAcestepStatus(busy ? "partial" : "error", busy ? "Busy" : "Unreachable");
     _setGenerateReady(false);
   }
 }
@@ -364,7 +365,9 @@ function _setGenerateReady(ready) {
   const btn = document.getElementById("generate-btn");
   const pipelineBtn = document.getElementById("run-pipeline-btn");
   if (btn) btn.disabled = !ready;
-  if (pipelineBtn) pipelineBtn.disabled = !ready;
+  // Pipeline button stays enabled while a pipeline is running so the user
+  // can click it to queue additional runs.
+  if (pipelineBtn && !_pipelineRunning) pipelineBtn.disabled = !ready;
 }
 
 async function _onGenerate() {
@@ -739,9 +742,7 @@ async function _onSaveRvcResult() {
     const result = await API.saveResult({
       audio_src_path: _rvcResultPath,
       input_filename: _sourceOriginalName || "vocal",
-      index: _resultOutputIndex,
     });
-    _resultOutputIndex++;
     Toast.show(`Saved: ${result.filename}`, "success");
   } catch (err) {
     Toast.show(`Save failed: ${err.message}`, "error");
@@ -771,9 +772,7 @@ async function _onSaveResult() {
     const result = await API.saveResult({
       audio_src_path: _resultRawPath,
       input_filename: _sourceOriginalName || "vocal",
-      index: _resultOutputIndex,
     });
-    _resultOutputIndex++;
     Toast.show(`Saved: ${result.filename}`, "success");
   } catch (err) {
     Toast.show(`Save failed: ${err.message}`, "error");
@@ -784,70 +783,171 @@ async function _onSaveResult() {
 
 // ------------------------------------------------------------------
 // Run Pipeline (audio processing + ACE-Step + auto-save)
+// Supports queueing: clicking the button while a run is active adds
+// a snapshot of the current settings to the queue.
 // ------------------------------------------------------------------
 
 function _bindRunPipelineBtn() {
   document.getElementById("run-pipeline-btn")?.addEventListener("click", _onRunPipeline);
 }
 
-async function _onRunPipeline() {
-  if (_activeJobId || _pipelineRunning) return;
-
+/** Capture all current form state into a plain object for deferred execution. */
+function _capturePipelineSnapshot() {
   const sourceWidget = _audioUploads.get("source-audio");
   const refWidget = _audioUploads.get("ref-audio");
   if (!sourceWidget?.getTempPath()) {
     Toast.show("Upload source audio first", "warning");
+    return null;
+  }
+
+  const batchSize = Math.max(1, Math.min(8, parseInt(_val("pipeline-batch-size") || "1", 10) || 1));
+  const loras = _collectLoras();
+
+  return {
+    sourcePath: sourceWidget.getTempPath(),
+    refPath: refWidget?.getTempPath() ?? null,
+    sourceOriginalName: _sourceOriginalName || "vocal",
+    // processAudio
+    pitchShift: _sliderVal("ts-pitch-shift"),
+    applyLowCut: document.getElementById("apply-low-cut")?.checked ?? false,
+    applyNoiseGate: document.getElementById("apply-noise-gate")?.checked ?? false,
+    // ACE-Step generate
+    batchSize,
+    loras,
+    loraName: loras[0]?.name || undefined,
+    loraScale: loras[0]?.scale ?? 1.0,
+    ditModel: _val("dit-model") || undefined,
+    caption: _val("caption"),
+    lyrics: _val("lyrics"),
+    lmStrength: _sliderVal("ts-remix-strength"),
+    coverStrength: _sliderVal("ts-cover-strength"),
+    inferenceSteps: _sliderVal("ts-inference-steps"),
+    guidanceScale: _sliderVal("ts-guidance-scale"),
+    inferMethod: _val("infer-method") || "ode",
+    useAdg: document.getElementById("use-adg")?.checked ?? false,
+    shift: _sliderVal("ts-shift"),
+    cfgStart: _sliderVal("ts-cfg-start"),
+    cfgEnd: _sliderVal("ts-cfg-end"),
+    keyscale: _val("keyscale"),
+    timesignature: _val("timesignature"),
+    vocalLanguage: _val("vocal-language") || "unknown",
+    seed: parseInt(_val("seed") ?? "-1", 10) || -1,
+    // RVC
+    modelPath: _val("rvc-model"),
+    rvcIndexPath: _val("rvc-index") || "",
+    rvcPitch: Math.round(_sliderVal("ts-rvc-pitch")),
+    rvcF0Method: _val("rvc-f0-method") || "rmvpe",
+    rvcIndexRate: _sliderVal("ts-rvc-index-rate"),
+    rvcVolumeEnvelope: _sliderVal("ts-rvc-volume-envelope"),
+    rvcProtect: _sliderVal("ts-rvc-protect"),
+    rvcCleanAudio: document.getElementById("rvc-clean-audio")?.checked ?? true,
+    rvcCleanStrength: _sliderVal("ts-rvc-clean-strength"),
+    rvcEmbedderModel: _val("rvc-embedder-model") || "contentvec",
+    rvcFilterRadius: Math.round(_sliderVal("ts-rvc-filter-radius")),
+    rvcSeed: parseInt(_val("rvc-seed") || "-1", 10),
+  };
+}
+
+/** Update button label to reflect running/queued state. */
+function _updatePipelineBtnText() {
+  const runBtn = document.getElementById("run-pipeline-btn");
+  if (!runBtn) return;
+  if (_pipelineRunning) {
+    const q = _pipelineQueue.length;
+    runBtn.disabled = false; // always clickable while running (for queueing)
+    runBtn.textContent = q > 0 ? `⏳ Running… (+${q} queued)` : "⏳ Running…";
+  } else {
+    runBtn.disabled = !_acestepReady;
+    runBtn.textContent = "▶ Run Pipeline";
+  }
+}
+
+async function _onRunPipeline() {
+  const snapshot = _capturePipelineSnapshot();
+  if (!snapshot) return;
+
+  if (_pipelineRunning) {
+    _pipelineQueue.push(snapshot);
+    _updatePipelineBtnText();
+    Toast.show(`Added to queue (${_pipelineQueue.length} run${_pipelineQueue.length > 1 ? "s" : ""} waiting)`, "info");
     return;
   }
 
-  const runBtn = document.getElementById("run-pipeline-btn");
-  const batchSize = Math.max(1, Math.min(8, parseInt(_val("pipeline-batch-size") || "1", 10) || 1));
-  const modelPath = _val("rvc-model");
+  await _executePipeline(snapshot);
+  // Drain any queued runs
+  while (_pipelineQueue.length > 0) {
+    const next = _pipelineQueue.shift();
+    _updatePipelineBtnText();
+    await _executePipeline(next);
+  }
+  _updatePipelineBtnText();
+}
 
+async function _executePipeline(snap) {
   _pipelineRunning = true;
   _setGenerateReady(false);
   _showPipelineProgress(true, "Processing audio…");
-  if (runBtn) {
-    runBtn.disabled = true;
-    runBtn.textContent = "⏳ Running…";
-  }
+  _updatePipelineBtnText();
 
   try {
-    let processedPath = sourceWidget.getTempPath();
+    let processedPath = snap.sourcePath;
     const processResult = await API.processAudio({
       audio_path: processedPath,
-      pitch_shift_semitones: _sliderVal("ts-pitch-shift"),
-      apply_low_cut: document.getElementById("apply-low-cut")?.checked ?? false,
-      apply_noise_gate: document.getElementById("apply-noise-gate")?.checked ?? false,
+      pitch_shift_semitones: snap.pitchShift,
+      apply_low_cut: snap.applyLowCut,
+      apply_noise_gate: snap.applyNoiseGate,
     });
     processedPath = processResult.processed_path;
 
-    _showPipelineProgress(true, `Running ACE-Step batch (${batchSize})…`);
-    const params = _buildGenerateParams(processedPath, refWidget?.getTempPath() ?? null, batchSize);
+    _showPipelineProgress(true, `Running ACE-Step batch (${snap.batchSize})…`);
+    const params = {
+      dit_model: snap.ditModel,
+      loras: snap.loras,
+      lora_name: snap.loraName,
+      lora_scale: snap.loraScale,
+      ref_audio_path: snap.refPath,
+      source_audio_path: processedPath,
+      caption: snap.caption,
+      lyrics: snap.lyrics,
+      thinking: false,
+      lm_strength: snap.lmStrength,
+      cover_strength: snap.coverStrength,
+      inference_steps: snap.inferenceSteps,
+      guidance_scale: snap.guidanceScale,
+      infer_method: snap.inferMethod,
+      use_adg: snap.useAdg,
+      shift: snap.shift,
+      cfg_interval_start: snap.cfgStart,
+      cfg_interval_end: snap.cfgEnd,
+      keyscale: snap.keyscale,
+      timesignature: snap.timesignature,
+      vocal_language: snap.vocalLanguage,
+      seed: snap.seed,
+      batch_size: snap.batchSize,
+    };
+
     const job = await _runGenerateJob(params, "pipeline");
     const rawPaths = job.raw_audio_paths || [];
-    if (!rawPaths.length) {
-      throw new Error("ACE-Step returned no audio outputs");
-    }
+    if (!rawPaths.length) throw new Error("ACE-Step returned no audio outputs");
 
     const outputsForSave = [];
-    if (modelPath) {
+    if (snap.modelPath) {
       for (let i = 0; i < rawPaths.length; i++) {
         _showPipelineProgress(true, `Running RVC ${i + 1}/${rawPaths.length}…`);
         const rvc = await API.runRvc({
           input_path: rawPaths[i],
-          model_path: modelPath,
-          index_path: _val("rvc-index") || "",
-          pitch: Math.round(_sliderVal("ts-rvc-pitch")),
-          f0_method: _val("rvc-f0-method") || "rmvpe",
-          index_rate: _sliderVal("ts-rvc-index-rate"),
-          volume_envelope: _sliderVal("ts-rvc-volume-envelope"),
-          protect: _sliderVal("ts-rvc-protect"),
-          clean_audio: document.getElementById("rvc-clean-audio")?.checked ?? true,
-          clean_strength: _sliderVal("ts-rvc-clean-strength"),
-          embedder_model: _val("rvc-embedder-model") || "contentvec",
-          filter_radius: Math.round(_sliderVal("ts-rvc-filter-radius")),
-          seed: parseInt(_val("rvc-seed") || "-1", 10),
+          model_path: snap.modelPath,
+          index_path: snap.rvcIndexPath,
+          pitch: snap.rvcPitch,
+          f0_method: snap.rvcF0Method,
+          index_rate: snap.rvcIndexRate,
+          volume_envelope: snap.rvcVolumeEnvelope,
+          protect: snap.rvcProtect,
+          clean_audio: snap.rvcCleanAudio,
+          clean_strength: snap.rvcCleanStrength,
+          embedder_model: snap.rvcEmbedderModel,
+          filter_radius: snap.rvcFilterRadius,
+          seed: snap.rvcSeed,
         });
         outputsForSave.push(rvc.output_path);
       }
@@ -859,10 +959,8 @@ async function _onRunPipeline() {
       _showPipelineProgress(true, `Saving ${i + 1}/${outputsForSave.length}…`);
       await API.saveResult({
         audio_src_path: outputsForSave[i],
-        input_filename: _sourceOriginalName || "vocal",
-        index: _resultOutputIndex,
+        input_filename: snap.sourceOriginalName,
       });
-      _resultOutputIndex++;
     }
 
     Toast.show(`Pipeline complete: saved ${outputsForSave.length} file(s)`, "success");
@@ -872,10 +970,6 @@ async function _onRunPipeline() {
     _pipelineRunning = false;
     _showPipelineProgress(false);
     _setGenerateReady(_acestepReady);
-    if (runBtn) {
-      runBtn.disabled = !_acestepReady;
-      runBtn.textContent = "▶ Run Pipeline";
-    }
   }
 }
 
@@ -892,7 +986,11 @@ function _showProgress(visible, text = "") {
 
 function _showPipelineProgress(visible, text = "") {
   const btn = document.getElementById("run-pipeline-btn");
-  if (btn) btn.classList.toggle("is-running", visible);
+  if (btn) {
+    btn.classList.toggle("is-running-queue", visible);
+    btn.classList.remove("is-running"); // never block clicks on pipeline btn
+  }
+  _updatePipelineBtnText();
 }
 
 function _updateProgress(target, text) {

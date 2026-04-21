@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import os
 import random
+import re
 import shutil
 import tempfile
 import time
@@ -571,15 +572,26 @@ def create_app(
 
         The output filename follows the pattern:
             {input_filename}_processed_{index}.wav
+        Index starts at 1 and increments based on files already present in the
+        output folder — so the same base name always starts fresh at _1.
         """
         src = Path(req.audio_src_path)
         if not src.exists():
             raise HTTPException(400, detail="audio_src_path does not exist")
 
         stem = Path(req.input_filename).stem if req.input_filename else "output"
-        dest_name = f"{stem}_processed_{req.index}.wav"
-        dest = _output_dir / dest_name
         _output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Determine the next available index by inspecting existing files.
+        existing_indices = [
+            int(m.group(1))
+            for f in _output_dir.glob(f"{stem}_processed_*.wav")
+            if (m := re.search(r"_processed_(\d+)\.wav$", f.name))
+        ]
+        next_index = max(existing_indices) + 1 if existing_indices else 1
+
+        dest_name = f"{stem}_processed_{next_index}.wav"
+        dest = _output_dir / dest_name
 
         # Convert to 16-bit WAV if not already
         loop = asyncio.get_running_loop()

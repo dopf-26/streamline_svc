@@ -501,6 +501,24 @@
   cursor: wait !important;
   pointer-events: none !important;
 }
+/* Pipeline variant: shows progress bar but keeps the button clickable for queueing */
+.subbar__run-btn.is-running-queue {
+  opacity: 1 !important;
+  cursor: pointer !important;
+  pointer-events: all !important;
+}
+.subbar__run-btn.is-running-queue::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.7);
+  animation: btn-progress-indeterminate 1.4s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
 .btn--generate.is-running::before,
 .subbar__run-btn.is-running::before {
   content: "";
