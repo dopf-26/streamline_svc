@@ -103,7 +103,7 @@ class AudioUpload {
       ev.target.value = "";  // reset so same file can be re-selected
     });
 
-    // Drag and drop
+    // Drag and drop — on empty dropzone
     this._dropzone?.addEventListener("dragover", (ev) => {
       ev.preventDefault();
       this._dropzone.classList.add("drag-over");
@@ -114,6 +114,24 @@ class AudioUpload {
     this._dropzone?.addEventListener("drop", (ev) => {
       ev.preventDefault();
       this._dropzone.classList.remove("drag-over");
+      const file = ev.dataTransfer?.files?.[0];
+      if (file) this._handleFile(file);
+    });
+
+    // Drag and drop — on loaded player (replace existing file)
+    this._playerEl = this.container.querySelector(".audio-upload__player");
+    this._playerEl?.addEventListener("dragover", (ev) => {
+      ev.preventDefault();
+      this.container.classList.add("drag-over");
+    });
+    this._playerEl?.addEventListener("dragleave", (ev) => {
+      if (!this._playerEl.contains(ev.relatedTarget)) {
+        this.container.classList.remove("drag-over");
+      }
+    });
+    this._playerEl?.addEventListener("drop", (ev) => {
+      ev.preventDefault();
+      this.container.classList.remove("drag-over");
       const file = ev.dataTransfer?.files?.[0];
       if (file) this._handleFile(file);
     });

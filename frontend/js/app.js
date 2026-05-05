@@ -930,8 +930,8 @@ async function _executePipeline(snap) {
     const rawPaths = job.raw_audio_paths || [];
     if (!rawPaths.length) throw new Error("ACE-Step returned no audio outputs");
 
-    const outputsForSave = [];
     if (snap.modelPath) {
+      const rvcOutputs = [];
       for (let i = 0; i < rawPaths.length; i++) {
         _showPipelineProgress(true, `Running RVC ${i + 1}/${rawPaths.length}…`);
         const rvc = await API.runRvc({
@@ -949,21 +949,36 @@ async function _executePipeline(snap) {
           filter_radius: snap.rvcFilterRadius,
           seed: snap.rvcSeed,
         });
-        outputsForSave.push(rvc.output_path);
+        rvcOutputs.push(rvc.output_path);
       }
+      // Load the last RVC result into the player and save all outputs
+      const lastRvcPath = rvcOutputs[rvcOutputs.length - 1];
+      _rvcResultPath = lastRvcPath;
+      _showRvcResult(API.tempAudioUrl(lastRvcPath));
+      for (let i = 0; i < rvcOutputs.length; i++) {
+        _showPipelineProgress(true, `Saving ${i + 1}/${rvcOutputs.length}…`);
+        await API.saveResult({
+          audio_src_path: rvcOutputs[i],
+          input_filename: snap.sourceOriginalName,
+        });
+      }
+      Toast.show(`Pipeline complete: saved ${rvcOutputs.length} file(s)`, "success");
     } else {
-      outputsForSave.push(...rawPaths);
+      // No RVC — load ACE-Step result into player and save
+      const lastRawPath = rawPaths[rawPaths.length - 1];
+      _resultRawPath = lastRawPath;
+      // Show the ACE-Step result in its waveform player
+      const audioUrl = API.tempAudioUrl(lastRawPath);
+      _showResult(audioUrl);
+      for (let i = 0; i < rawPaths.length; i++) {
+        _showPipelineProgress(true, `Saving ${i + 1}/${rawPaths.length}…`);
+        await API.saveResult({
+          audio_src_path: rawPaths[i],
+          input_filename: snap.sourceOriginalName,
+        });
+      }
+      Toast.show(`Pipeline complete: saved ${rawPaths.length} file(s)`, "success");
     }
-
-    for (let i = 0; i < outputsForSave.length; i++) {
-      _showPipelineProgress(true, `Saving ${i + 1}/${outputsForSave.length}…`);
-      await API.saveResult({
-        audio_src_path: outputsForSave[i],
-        input_filename: snap.sourceOriginalName,
-      });
-    }
-
-    Toast.show(`Pipeline complete: saved ${outputsForSave.length} file(s)`, "success");
   } catch (err) {
     Toast.show(`Pipeline failed: ${err.message}`, "error");
   } finally {

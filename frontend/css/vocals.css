@@ -771,6 +771,7 @@
 }
 .audio-upload.has-file .audio-upload__dropzone { display: none; }
 .audio-upload.has-file .audio-upload__player { display: flex; }
+.audio-upload.has-file.drag-over .audio-upload__player { outline: 2px solid var(--primary); outline-offset: -2px; background: var(--primary-dim); border-radius: var(--radius); }
 .audio-upload__waveform { height: 52px; background: var(--bg); }
 .audio-upload__controls {
   display: flex;
